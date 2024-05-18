@@ -2,18 +2,10 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-const char* vertexShaderSource = "#version 330 core\n"
-"layout (location = 0) in vec3 aPos;\n"
-"void main()\n"
-"{\n"
-"	gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
-"}\n\0";
-const char* fragmentShaderSource = "#version 330 core\n"
-"out vec4 FragColor;\n"
-"void main()\n"
-"{\n"
-"	FragColor = vec4(0.8f, 0.3f, 0.02f, 1.0f);\n"
-"}\n\0";
+#include "ShaderClass.h"
+#include "VBO.h"
+#include "EBO.h"
+#include "VAO.h"
 
 int main() 
 {
@@ -27,9 +19,19 @@ int main()
 	// normal floats might differ from the size of floats that OpenGL uses
 	GLfloat vertices[] =
 	{
-		-0.5, -0.5 * float(sqrt(3)) / 3, 0.0f,
-		0.5, -0.5 * float(sqrt(3)) / 3, 0.0f,
-		0.0, 0.5 * float(sqrt(3)) * 2 / 3, 0.0f
+		-0.5, -0.5 * float(sqrt(3)) / 3, 0.0f,  // lower left corner
+		0.5, -0.5 * float(sqrt(3)) / 3, 0.0f,  // lower right corner
+		0.0, 0.5 * float(sqrt(3)) * 2 / 3, 0.0f,  // upper corner
+		-0.5f / 2, 0.5f * float(sqrt(3)) / 6, 0.0f,  // inner left
+		0.5f / 2, 0.5f * float(sqrt(3)) / 6, 0.0f,  // inner right
+		0.0f / 2, -0.5f * float(sqrt(3)) / 3, 0.0f  // inner down
+	};
+
+	GLuint indices[] =
+	{
+		0, 3, 5,  // lower left triangle
+		3, 2, 4,  // lower right triangle
+		5, 4, 1,  // upper triangle
 	};
 
 	GLFWwindow* window = glfwCreateWindow(800, 800, "Youtube OpenGL", NULL, NULL);
@@ -45,61 +47,18 @@ int main()
 
 	glViewport(0, 0, 800, 800);
 
-	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-	glCompileShader(vertexShader);
+	Shader shaderProgram("default.vert", "default.frag");
 
-	GLint shaderStatus;
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &shaderStatus);
-	if (shaderStatus == GL_FALSE)
-	{
-		std::cout << "Failed to compile vertex shader" << std::endl;
-	}
-	else
-	{
-		std::cout << "Compiled vertex shader!" << std::endl;
-	}
+	VAO vao1;
+	vao1.Bind();
 
-	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-	glCompileShader(fragmentShader);
+	VBO vbo1(vertices, sizeof(vertices));
+	EBO ebo1(indices, sizeof(indices));
 
-	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &shaderStatus);
-	if (shaderStatus == GL_FALSE)
-	{
-		std::cout << "Failed to compile fragment shader" << std::endl;
-	}
-	else
-	{
-		std::cout << "Compiled fragment shader!" << std::endl;
-	}
-
-	GLuint shaderProgram = glCreateProgram();
-	glAttachShader(shaderProgram, vertexShader);
-	glAttachShader(shaderProgram, fragmentShader);
-	glLinkProgram(shaderProgram);
-
-	glDeleteShader(vertexShader);
-	glDeleteShader(fragmentShader);
-
-	// Vertex Array Object, stores pointers to one or more VBOs and tells OpenGL how to interpret them
-	GLuint VAO;
-	glGenVertexArrays(1, &VAO);
-
-	// Vertex Buffer Object
-	GLuint VBO;
-	glGenBuffers(1, &VBO);  // We only have 1 3D object
-	
-	glBindVertexArray(VAO);
-
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-	// How to talk to the vertex shader from the outside
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	vao1.LinkVBO(vbo1, 0);
+	vao1.Unbind();
+	vbo1.Unbind();
+	ebo1.Unbind();
 
 	glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -113,17 +72,20 @@ int main()
 	{
 		glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
-		glUseProgram(shaderProgram);
-		glBindVertexArray(VAO);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-		glfwSwapBuffers(window);
 
+		shaderProgram.Activate();
+		vao1.Bind();
+		
+		glDrawElements(GL_TRIANGLES, 9, GL_UNSIGNED_INT, 0);
+		
+		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
 
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
-	glDeleteProgram(shaderProgram);
+	vao1.Delete();
+	vbo1.Delete();
+	ebo1.Delete();
+	shaderProgram.Delete();
 
 	glfwDestroyWindow(window);
 	glfwTerminate();
